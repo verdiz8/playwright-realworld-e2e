@@ -1,0 +1,15 @@
+{
+  "name": "playwright-realworld-e2e",
+  "version": "1.0.0",
+  "description": "Production-grade Playwright E2E suite against a public demo app. Page objects, API interception, data-driven tests, CI-ready.",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "typescript": "^5.6.0"
+  }
+}
