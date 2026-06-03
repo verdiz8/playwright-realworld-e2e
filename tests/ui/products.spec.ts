@@ -1,26 +1,20 @@
-import { test, expect } from "@playwright/test";
-import { LoginPage } from "../pages/login.page";
-import { ProductsPage } from "../pages/products.page";
-import { users } from "../fixtures/test-data";
+import { test, expect } from "../../fixtures/custom-fixtures";
+import { users } from "../../fixtures/test-data";
 
 test.describe("Products", () => {
-  let productsPage: ProductsPage;
+  /*
+   * Uses the custom `authenticatedPage` fixture from fixtures/custom-fixtures.ts.
+   * This replaces the manual login boilerplate in beforeEach with a typed fixture
+   * that handles auth and returns a ready-to-use ProductsPage.
+   */
 
-  test.beforeEach(async ({ page }) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(users.standard.username, users.standard.password);
-    productsPage = new ProductsPage(page);
-    await expect(productsPage.inventoryList).toBeVisible();
-  });
-
-  test("product list loads with items", async () => {
+  test("product list loads with items", async ({ authenticatedPage: productsPage }) => {
     const names = await productsPage.getAllProductNames();
     expect(names.length).toBeGreaterThan(0);
     names.forEach((name) => expect(name.length).toBeGreaterThan(0));
   });
 
-  test("add single item to cart updates badge", async () => {
+  test("add single item to cart updates badge", async ({ authenticatedPage: productsPage }) => {
     const initial = await productsPage.getCartCount();
     expect(initial).toBe(0);
 
@@ -31,7 +25,7 @@ test.describe("Products", () => {
     expect(count).toBe(1);
   });
 
-  test("sort by price low-to-high orders correctly", async () => {
+  test("sort by price low-to-high orders correctly", async ({ authenticatedPage: productsPage }) => {
     await productsPage.sortBy("lohi");
 
     // Grab prices from the page
@@ -46,7 +40,7 @@ test.describe("Products", () => {
     }
   });
 
-  test("sort by name Z-A reverses order", async () => {
+  test("sort by name Z-A reverses order", async ({ authenticatedPage: productsPage }) => {
     await productsPage.sortBy("za");
     const names = await productsPage.getAllProductNames();
 
