@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { LoginPage } from "../pages/login.page";
-import { ProductsPage } from "../pages/products.page";
-import { CheckoutPage } from "../pages/checkout.page";
-import { users, shippingScenarios } from "../fixtures/test-data";
+import { LoginPage } from "../../pages/login.page";
+import { ProductsPage } from "../../pages/products.page";
+import { CheckoutPage } from "../../pages/checkout.page";
+import { users, shippingScenarios } from "../../fixtures/test-data";
 
 test.describe("Checkout", () => {
   test.beforeEach(async ({ page }) => {

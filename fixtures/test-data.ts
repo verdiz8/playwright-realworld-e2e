@@ -1,5 +1,3 @@
-import type { LoginCredentials, ShippingInfo } from "./test-data";
-
 /**
  * Test data factory — all test inputs live here.
  * Separating data from logic means:

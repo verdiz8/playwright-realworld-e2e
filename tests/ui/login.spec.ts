@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
-import { LoginPage } from "../pages/login.page";
-import { ProductsPage } from "../pages/products.page";
-import { loginScenarios } from "../fixtures/test-data";
+import { LoginPage } from "../../pages/login.page";
+import { ProductsPage } from "../../pages/products.page";
+import { loginScenarios } from "../../fixtures/test-data";
 
 test.describe("Login", () => {
   let loginPage: LoginPage;

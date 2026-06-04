@@ -10,6 +10,21 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 10_000 },
 
+  /*
+   * Tag-based test selection — uncomment to filter by tag in CI or locally.
+   * Grep supports regex; invert with grepInvert.
+   *
+   * Usage:
+   *   npx playwright test --grep '@smoke'          # smoke tests only
+   *   npx playwright test --grep '@smoke|@regression'
+   *   npx playwright test --grep-invert '@slow'    # skip slow tests
+   *
+   * To tag a test, add an annotation in the test body:
+   *   test('name', { tag: ['@smoke', '@regression'] }, async ({ page }) => { ... })
+   */
+  // grep: /@smoke/,
+  // grepInvert: /@slow/,
+
   use: {
     baseURL: "https://www.saucedemo.com",
     trace: "on-first-retry",

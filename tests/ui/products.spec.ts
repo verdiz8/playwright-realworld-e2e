@@ -1,5 +1,4 @@
 import { test, expect } from "../../fixtures/custom-fixtures";
-import { users } from "../../fixtures/test-data";
 
 test.describe("Products", () => {
   /*
