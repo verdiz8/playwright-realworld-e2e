@@ -106,6 +106,60 @@ JSON files have no type checking — a typo in a username field surfaces at runt
 
 ---
 
+## 8. Network interception (`page.route()`), not real HTTP calls for API testing
+
+**Options considered:**
+- Skip API tests entirely (Sauce Demo has no real API)
+- Real HTTP calls against the Sauce Demo server
+- Playwright `page.route()` for interception, mocking, and spying
+
+**Chosen: `page.route()` interception.**
+
+Sauce Demo serves static HTML — there are no real API endpoints to test. A junior approach would skip this layer. A senior approach uses Playwright's network interception to demonstrate the *pattern*:
+
+- `page.route()` mocks responses → tests UI behaviour under controlled conditions
+- `page.on('request')` spies on outgoing calls → asserts the frontend sends correct data
+- `route.abort()` simulates failures → verifies graceful degradation
+- `route.fulfill()` injects custom responses → tests edge cases without a real backend
+
+Initial attempts intercepted the wrong URLs — Sauce Demo navigates differently than a modern SPA. The mock-500 test initially targeted `checkout-step-one.html` (the form page), but the app navigates *away* from it on submit. Fixed by intercepting `cart.html` directly and verifying the injected error response renders instead of the real page. Similarly, the spy test initially expected "cart" in request URLs after clicking the cart link, but Sauce Demo uses full page navigations — fixed by listening for navigation to `/inventory.html` and asserting the full cascade of document + asset requests.
+
+This matters because in a real project, mocking the API layer means tests don't depend on backend availability. They're faster, more deterministic, and can simulate every error path.
+
+---
+
+## 9. Custom Playwright fixtures over beforeEach auth blocks
+
+**Options considered:**
+- Duplicate login code in every test file's `beforeEach`
+- Create a helper function
+- Extend Playwright's `test` with a custom fixture
+
+**Chosen: Custom fixture (`test.extend()`).**
+
+Duplicating `loginPage.goto() → loginPage.login() → new ProductsPage()` in every `beforeEach` violates DRY. A helper function works but isn't discoverable — new test authors don't know it exists.
+
+Playwright fixtures are the idiomatic solution: they're typed, auto-complete in the editor, and clean up automatically. `test.extend()` creates an `authenticatedPage` fixture that handles login + inventory assertion, returning a ready-to-use `ProductsPage`. Test files opt in by importing from `@fixtures/custom-fixtures` instead of `@playwright/test`.
+
+This pattern scales: add a `storageState` fixture for shared auth across files, a `mockBackend` fixture for API testing, or a `seedData` fixture for data setup.
+
+---
+
+## 10. Strict TypeScript config — test code deserves the same rigour as app code
+
+**Options considered:**
+- Minimal `tsconfig.json` (just enough to compile)
+- No `tsconfig.json` at all (rely on Playwright defaults)
+- Strict config with `noUncheckedIndexedAccess`, `noUnusedLocals`
+
+**Chosen: Strict TypeScript.**
+
+Test code is still code. A typo in a fixture interface or an unchecked array index can cause a test to pass incorrectly (false positive) or fail confusingly. `strict: true` catches mismatched data shapes at compile time. `noUncheckedIndexedAccess: true` forces explicit undefined checks on array access — relevant when `page.locator().allTextContents()` returns an empty array.
+
+The cost is minimal: a few extra type annotations. The benefit is confidence that the test data flowing through the system is correctly shaped end-to-end.
+
+---
+
 ## What I'd do differently at scale
 
 If this were a real production suite with 500+ tests:

@@ -6,9 +6,12 @@ Production-grade Playwright E2E suite against [Sauce Demo](https://www.saucedemo
 
 - Page Object Model architecture
 - Data-driven testing (typed fixtures, not hardcoded values)
+- Network interception (`page.route()` mocking, spying, error injection)
+- Custom Playwright fixtures (extending `test` for reusable auth state)
 - Cross-browser CI (Chromium + Firefox via GitHub Actions)
 - API-level validation alongside UI tests
-- Decision-documented test strategy (DECISIONS.md)
+- Decision-documented test strategy (DECISIONS.md — 10 decisions)
+- Strict TypeScript (`noUncheckedIndexedAccess`, zero implicit any)
 
 ## Commands
 
@@ -26,10 +29,11 @@ npm run report                 # open HTML report
 ```
 pages/              ← Page objects (BasePage, LoginPage, ProductsPage, CheckoutPage)
 tests/ui/           ← UI test specs (login, products, checkout)
-tests/api/          ← API-level tests (products-api)
-fixtures/           ← Typed test data factories (users, login scenarios, shipping)
-playwright.config.ts ← CI-ready config (2 browsers, trace on retry, screenshot on fail)
-.github/workflows/  ← CI pipeline (Chromium + Firefox matrix, artifact upload on failure)
+tests/api/          ← Network interception tests (page.route mocking, spying, error injection)
+fixtures/           ← Typed test data + custom Playwright fixtures (auth, pre-auth page)
+playwright.config.ts ← CI-ready config (2 browsers, trace on retry, screenshot on fail, test tagging)
+.github/workflows/  ← CI pipeline (Chromium + Firefox matrix, artifact upload, scheduled runs)
+tsconfig.json       ← Strict TypeScript — catches data shape errors at build time
 ```
 
 ## Architecture decisions (see DECISIONS.md for full rationale)
@@ -39,6 +43,11 @@ playwright.config.ts ← CI-ready config (2 browsers, trace on retry, screenshot
 3. **Data-driven via typed fixtures** — `for...of` over typed arrays beats `test.each` (loses types) and JSON files (no compile checks).
 4. **API tests in same project** — separate `tests/api/` directory. Sauce Demo has no real API, but the pattern is what matters.
 5. **Two browsers in CI** — Chromium + Firefox. WebKit on Linux CI is flaky; diminishing returns.
+6. **Trace on first retry** — debug data for flaky tests without the perf cost of always-on.
+7. **Test data in typed fixtures** — compile-time errors for bad data, autocomplete, one source of truth.
+8. **Network interception via `page.route()`** — mocks at the network layer test the full stack; faster and more deterministic than real endpoints.
+9. **Custom Playwright fixtures** — `test.extend()` for DRY auth setup; demonstrates framework extension.
+10. **Strict TypeScript** — `noUncheckedIndexedAccess`, `strict: true` catches issues before runtime.
 
 ## Where to extend
 
@@ -58,9 +67,11 @@ If this were a real 500+ test suite (from DECISIONS.md):
 | `pages/products.page.ts` | Inventory list, sorting, add-to-cart |
 | `pages/checkout.page.ts` | Multi-step checkout flow |
 | `fixtures/test-data.ts` | All test inputs — users, login scenarios, shipping info |
+| `fixtures/custom-fixtures.ts` | Extended Playwright test — pre-authenticated page fixture |
 | `tests/ui/login.spec.ts` | Data-driven login tests (success + error cases) |
-| `tests/ui/products.spec.ts` | Product list, cart badge, sorting |
+| `tests/ui/products.spec.ts` | Product list, cart badge, sorting (uses custom fixture) |
 | `tests/ui/checkout.spec.ts` | Full checkout flow + validation error |
-| `tests/api/products-api.spec.ts` | HTTP-level assertions (auth redirects, response structure) |
-| `playwright.config.ts` | 2 browsers, retries in CI, trace on failure |
-| `DECISIONS.md` | Full decision log — the differentiator for recruiters |
+| `tests/api/products-api.spec.ts` | Network interception — `page.route()`, request spying, error mocking |
+| `playwright.config.ts` | 2 browsers, retries in CI, trace on failure, test tagging setup |
+| `tsconfig.json` | Strict TypeScript (`noUncheckedIndexedAccess`, bundler resolution) |
+| `DECISIONS.md` | Full decision log (10 decisions) — the differentiator for recruiters |

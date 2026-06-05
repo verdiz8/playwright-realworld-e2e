@@ -4,6 +4,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # Weekly run to catch regressions from Sauce Demo changes
+    - cron: "37 7 * * 1"
+  workflow_dispatch:
 
 jobs:
   e2e:

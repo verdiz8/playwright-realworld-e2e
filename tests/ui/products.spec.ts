@@ -35,7 +35,7 @@ test.describe("Products", () => {
 
     // Verify ascending order
     for (let i = 1; i < numeric.length; i++) {
-      expect(numeric[i]).toBeGreaterThanOrEqual(numeric[i - 1]);
+      expect(numeric[i]!).toBeGreaterThanOrEqual(numeric[i - 1]!);
     }
   });
 

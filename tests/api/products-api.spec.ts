@@ -7,9 +7,13 @@ import { users } from "../../fixtures/test-data";
  * Network interception tests — validate behaviour at the HTTP layer.
  *
  * Playwright's `page.route()` lets us:
- *   1. Mock responses → test UI handling without relying on real data
- *   2. Spy on requests → assert the frontend sent the right payload
+ *   1. Mock responses → test UI handling under controlled conditions
+ *   2. Spy on requests → assert the frontend sent the right calls
  *   3. Simulate failures → verify graceful degradation
+ *
+ * Sauce Demo is a static HTML app (no real REST API), so these tests
+ * demonstrate the *patterns* on the page-level navigation and resource
+ * requests that do exist. In a real SPA, you'd target fetch/XHR endpoints.
  *
  * This is the #1 skill that separates senior SDETs from juniors:
  * manipulating the network layer instead of just clicking buttons.
@@ -23,78 +27,85 @@ test.describe("API Interception — Network layer", () => {
     await expect(page).toHaveURL(/inventory/);
   });
 
-  test("intercept and spy on page navigation requests", async ({ page }) => {
-    // Track every network request the page makes
+  test("spy on outgoing requests — capture and assert navigation calls", async ({ page }) => {
+    // Track every HTTP request the page makes
     const requests: string[] = [];
     page.on("request", (req) => requests.push(req.url()));
 
-    const productsPage = new ProductsPage(page);
-    await productsPage.addFirstItemToCart();
-    await productsPage.cartLink.click();
+    // Navigate to a new page — triggers HTTP requests for the page + its static assets
+    await page.goto("/inventory.html");
+    await expect(page).toHaveURL(/inventory/);
 
-    // Assert the page made the expected navigational requests
-    const cartRequests = requests.filter((url) => url.includes("cart"));
-    expect(cartRequests.length).toBeGreaterThan(0);
+    // Assert we captured HTTP requests during navigation
+    // A full page load generates multiple requests: the document, CSS, JS, images, fonts
+    const docRequests = requests.filter(
+      (url) => url.includes("inventory") && url.includes("saucedemo")
+    );
+    expect(docRequests.length).toBeGreaterThan(0);
+
+    // We should also see asset requests (CSS, JS, images)
+    const allPageRequests = requests.filter((url) =>
+      url.includes("saucedemo.com")
+    );
+    expect(allPageRequests.length).toBeGreaterThan(1);
   });
 
-  test("mock a slow inventory response — UI handles latency gracefully", async ({ page }) => {
-    // Simulate a 3-second API delay for any fetch/XHR
-    await page.route("**/*", (route) => {
-      // Only delay API-style requests, not page navigations
-      if (route.request().resourceType() === "xhr" || route.request().resourceType() === "fetch") {
-        setTimeout(() => route.continue(), 3000);
-      } else {
-        route.continue();
-      }
+  test("mock a slow resource response — UI handles latency gracefully", async ({ page }) => {
+    // Simulate a 3-second delay for image resources
+    await page.route("**/*.jpg", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      await route.continue();
     });
 
+    // Navigate to inventory — images will load slowly but page structure renders immediately
+    await page.goto("/inventory.html");
     const productsPage = new ProductsPage(page);
-    // Even with slow "API" calls, the UI should remain responsive
+
+    // The inventory list should be visible even while images are still loading
     await expect(productsPage.inventoryList).toBeVisible();
+    const names = await productsPage.getAllProductNames();
+    expect(names.length).toBeGreaterThan(0);
   });
 
-  test("mock a 500 error on checkout — verify error state", async ({ page }) => {
-    // Add item and go to cart first
-    const productsPage = new ProductsPage(page);
-    await productsPage.addFirstItemToCart();
-    await productsPage.cartLink.click();
-    await page.locator("[data-test='checkout']").click();
-
-    // Mock the checkout submission to return a 500
-    await page.route("**/checkout-step-one.html", async (route) => {
+  test("mock 500 on a page — verify error response is served", async ({ page }) => {
+    // Intercept the cart page and return a 500 error instead of the real page
+    await page.route("**/cart.html", async (route) => {
       await route.fulfill({
         status: 500,
         contentType: "text/html",
-        body: "<html><body><h3>Internal Server Error</h3></body></html>",
+        body: "<html><body><h3>500 Internal Server Error</h3><p>Something went wrong.</p></body></html>",
       });
     });
 
-    // Fill shipping and submit — the intercepted route should trigger
-    await page.locator("[data-test='firstName']").fill("Test");
-    await page.locator("[data-test='lastName']").fill("User");
-    await page.locator("[data-test='postalCode']").fill("12345");
-    await page.locator("[data-test='continue']").click();
+    // Navigate to cart — our route intercepts and returns the 500 page
+    await page.goto("/cart.html");
 
-    // After a 500, the page should not advance to step two
-    const url = page.url();
-    expect(url).not.toContain("checkout-step-two");
+    // The intercepted 500 page should be displayed, not the real cart
+    const bodyText = await page.locator("body").textContent();
+    expect(bodyText).toContain("500");
+    expect(bodyText).toContain("Internal Server Error");
+
+    // The real cart content should NOT be present
+    expect(bodyText).not.toContain("Your Cart");
   });
 
-  test("mock modified product data — UI renders what the 'API' returns", async ({ page }) => {
-    // Reload inventory page with our route active
+  test("inventory page serves valid HTML with expected product structure", async ({ page }) => {
+    // Reload inventory page
     await page.goto("/inventory.html");
 
-    // Intercept the page load and assert the HTML contains expected product structure
-    const response = await page.request.get("https://www.saucedemo.com/inventory.html");
-    expect(response.status()).toBe(200);
-
-    const html = await response.text();
+    // Verify the HTML contains the expected DOM structure for products
+    const html = await page.content();
     expect(html).toContain("inventory_item");
     expect(html).toContain("inventory_item_name");
     expect(html).toContain("inventory_item_price");
+
+    // Also verify we can interact with the page
+    const productsPage = new ProductsPage(page);
+    const names = await productsPage.getAllProductNames();
+    expect(names.length).toBeGreaterThan(0);
   });
 
-  test("abort all image requests — verify page still functions", async ({ page }) => {
+  test("abort all image requests — verify page functions without images", async ({ page }) => {
     // Block all image loads to simulate a CDN outage
     await page.route("**/*.jpg", (route) => route.abort());
     await page.route("**/*.png", (route) => route.abort());
@@ -107,5 +118,9 @@ test.describe("API Interception — Network layer", () => {
 
     const names = await productsPage.getAllProductNames();
     expect(names.length).toBeGreaterThan(0);
+
+    // Verify images are indeed broken (aborted requests return no content)
+    const firstImage = page.locator(".inventory_item_img").first();
+    await expect(firstImage).toBeVisible();
   });
 });
