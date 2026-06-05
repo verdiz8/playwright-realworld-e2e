@@ -1,9 +1,9 @@
 name: Playwright E2E
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
   schedule:
     # Weekly run to catch regressions from Sauce Demo changes
     - cron: "37 7 * * 1"
